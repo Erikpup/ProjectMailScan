@@ -10,17 +10,15 @@ import time
 import ctypes
 
 start_time = time.time()
-pattern = {
-    1: "\\b\\d{4} \\d{4} \\d{4} \\d{4}\\b|\\d{4} \\d{4} \\d{4} \\d{4}(?!\\d)|\\d{16}$(?!\\d)|^d{16}\\$",
-    2:  "\\b\\d{20}\\b|\\d{20}(?!\\d)"
-    }
-def c_analys(text, pattern, file_path, type_file):
+
+def c_analys(text, pattern, file_path, type_file,dict_total):
     dll_module = ctypes.CDLL('./Dll1.dll')
     dll_module.leakDetection.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     dll_module.leakDetection.restype = ctypes.c_bool
     for key, info in pattern.items():
         if dll_module.leakDetection(text.encode("utf-8"), info.encode("utf-8")):
             print(f"Done {file_path}  |  {type_file}  |  {pattern[key]}  |")
+            dict_total[str(key)].append(file_path,type_file)
             return 1
     return 0
 
@@ -30,7 +28,7 @@ async def read_file(file_path):
         content = await f.read()
     return content
 
-async def process_eml(file_path, pattern):
+async def process_eml(file_path, pattern,dict_total):
     content = await read_file(file_path)
     msg = BytesParser(policy=policy.default).parsebytes(content)
 
@@ -44,14 +42,14 @@ async def process_eml(file_path, pattern):
     if body is not None:
         # print(f"Текст из файла {file_path}:")
         # print(body.get_content())
-        c_analys(body.get_content(), pattern, file_path, 'text')
+        c_analys(body.get_content(), pattern, file_path, 'text',dict_total)
 
     for part in msg.iter_parts():
-        await check_pdf_attachment(msg, part, file_path, pattern)
-        await check_docx_attachment(msg, part, file_path, pattern)
-        await check_txt_attachment(msg, part, file_path, pattern)
+        await check_pdf_attachment(msg, part, file_path, pattern,dict_total)
+        await check_docx_attachment(msg, part, file_path, pattern,dict_total)
+        await check_txt_attachment(msg, part, file_path, pattern,dict_total)
 
-async def check_docx_attachment(msg, part, file_path, pattern):
+async def check_docx_attachment(msg, part, file_path, pattern,dict_total):
     if part.get_content_maintype() == 'multipart':
         return
     if part.get('Content-Disposition') is None:
@@ -62,17 +60,17 @@ async def check_docx_attachment(msg, part, file_path, pattern):
     if part.get_filename() and part.get_filename().endswith('.docx'):
         doc = Document(BytesIO(attachment))
         text = '\n'.join([para.text for para in doc.paragraphs])
-        c_analys(text, pattern, file_path, '.docx')
+        c_analys(text, pattern, file_path, '.docx',dict_total)
         #print("Название '.docx' файла: ", part.get_filename())
         #print("Содержимое '.docx' файла: ", full_text)
 
-async def check_txt_attachment(msg, part, file_path, pattern):
+async def check_txt_attachment(msg, part, file_path, pattern,dict_total):
     if part.get_filename() and part.get_filename().endswith('.txt'):
         #print(f"Название '.txt' файла: {part.get_filename()}")
         #print(f"Содержимое '.txt' файла: {part.get_content().decode('utf-16')}")
-        c_analys(part.get_content().decode('utf-16'), pattern, file_path, '.txt')
+        c_analys(part.get_content().decode('utf-16'), pattern, file_path, '.txt',dict_total)
 
-async def check_pdf_attachment(msg, part, file_path, pattern):
+async def check_pdf_attachment(msg, part, file_path, pattern,dict_total):
     if part.get_content_maintype() == 'multipart':
         return
     if part.get('Content-Disposition') is None:
@@ -82,22 +80,26 @@ async def check_pdf_attachment(msg, part, file_path, pattern):
         return
     if part.get_filename() and part.get_filename().endswith('.pdf'):
         text = extract_text(BytesIO(attachment))
-        c_analys(text, pattern, file_path, '.pdf')
+        c_analys(text, pattern, file_path, '.pdf',dict_total)
         #print(f"Название '.pdf' файла: {part.get_filename()}")
         #print(f"Содержимое '.pdf' файла: {full_text}")
 
-async def process_directory(dir_path, pattern):
+async def process_directory(dir_path, pattern,dict_total):
     tasks = []
     for file in os.listdir(dir_path):
         if file.endswith(".eml"):
-            task = asyncio.create_task(process_eml(os.path.join(dir_path, file), pattern))
+            task = asyncio.create_task(process_eml(os.path.join(dir_path, file), pattern,dict_total))
             tasks.append(task)
     await asyncio.gather(*tasks)
 
 # Запуск обработки директории
-dir_path = "C:\\Users\\Loque\\Desktop\\Samples\\card"
-asyncio.run(process_directory(dir_path, pattern))
-end_time = time.time()
-execution_time = end_time - start_time
+def start_analys(dir_path, pattern):
+    dict_total = {}
+    for key in pattern.keys():
+        dict_total[key] = []
+    asyncio.run(process_directory(dir_path, pattern, dict_total))
+    end_time = time.time()
+    execution_time = end_time - start_time
 
-print(f"Время выполнения программы: {execution_time/60} минут")
+    print(f"Время выполнения программы: {execution_time/60} минут")
+    return dict_total

@@ -14,6 +14,7 @@ from kivymd.app import MDApp
 from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
 from kivymd.uix.card import MDCard
 from kivymd.uix.textfield import MDTextField
+import scan_mails
 
 
 class WindowRight(GridLayout):
@@ -22,6 +23,7 @@ class WindowRight(GridLayout):
         super().__init__(**kwargs)
         with self.canvas:
             Color(1, 1, 1, 1)  # set the colour
+
 
             # Setting the size and position of canvas
             self.rect = Rectangle(pos=self.center,
@@ -34,7 +36,6 @@ class WindowRight(GridLayout):
     def update_rect(self, *args):
         self.rect.pos = self.pos
         self.rect.size = self.size
-
 
 class WindowList(GridLayout):
     def __init__(self, **kwargs):
@@ -80,7 +81,7 @@ class MainMD(GridLayout):
             txt = Label(text=i[1], halign="left", valign="middle")
             txt.bind(size=txt.setter('text_size'))
 
-            self.dict_check.setdefault(ck,i[2])
+            self.dict_check.setdefault(ck,{str(i[0]):i[2]})
 
             # Добавление объектов в список
             yacheyka.add_widget(ck)
@@ -97,14 +98,14 @@ class MainMD(GridLayout):
         right_layout = GridLayout(rows=2, spacing=20, size_hint=(.8, .9))
         right_layout_top = GridLayout(rows=2, spacing=40)
         right_layout_buttom = GridLayout(rows=2, spacing=40)
-        btn_analys = MDButton( MDButtonText( text= "Analys" , pos_hint= {"center_x": .5, "center_y": .5}),style= "tonal", pos_hint= {"center_x": .5, "center_y": .5}, theme_width= "Custom", height="56dp", size_hint_x= 1)
+        btn_analys = MDButton( MDButtonText( text= "Analys" , pos_hint= {"center_x": .5, "center_y": .5}),style= "tonal", pos_hint= {"center_x": .5, "center_y": .5}, theme_width= "Custom", height="56dp", size_hint_x= 1,on_press=self.analys)
         btn_add_type = MDButton(MDButtonIcon(icon= "plus"), MDButtonText( text= "Добавить фильтр" , pos_hint= {"center_x": .5, "center_y": .5}),style= "tonal", pos_hint= {"center_x": .5, "center_y": .5}, theme_width= "Custom", height="56dp", size_hint_x= 1)
         btn_remove_type = MDButton(MDButtonIcon(icon= "trash-can"), MDButtonText( text= "Удалить фильтр" , pos_hint= {"center_x": .5, "center_y": .5}),style= "tonal", pos_hint= {"center_x": .5, "center_y": .5}, theme_width= "Custom", height="56dp", size_hint_x= 1)
-        input_path = MDTextField(text="Путь к данным")
+        self.input_path = MDTextField(text="Путь к данным")
 
         right_layout_top.add_widget(btn_add_type)
         right_layout_top.add_widget(btn_remove_type)
-        right_layout_buttom.add_widget(input_path)
+        right_layout_buttom.add_widget(self.input_path)
         right_layout_buttom.add_widget(btn_analys)
         right_layout.add_widget(right_layout_top)
         right_layout.add_widget(right_layout_buttom)
@@ -133,8 +134,14 @@ class MainMD(GridLayout):
         return types
 
 
-    def analys(self):
-        pass
+    def analys(self, bnt):
+        for check in self.dict_check.keys():
+            if (check.state=="down"):
+                print(self.dict_check[check])
+                print(self.input_path.text)
+
+                print(scan_mails.start_analys(self.input_path.text,self.dict_check[check]))
+
 
 # Defining a class
 class MyFirstKivyApp(MDApp):
