@@ -12,7 +12,7 @@ async def read_file(file_path):
     async with aiofiles.open(file_path, mode='rb') as f:
         content = await f.read()
     return content
-
+#ggggg
 async def process_eml(file_path):
     content = await read_file(file_path)
     msg = BytesParser(policy=policy.default).parsebytes(content)
