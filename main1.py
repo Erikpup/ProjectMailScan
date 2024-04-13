@@ -3,11 +3,21 @@ from email import policy
 from email.parser import BytesParser
 from docx import Document
 import io
+import ctypes
 
 # Путь к папке с .eml файлами
 folder_path = "C:\\SmallMailBox"
 
-def emails_input():
+def open_dll():
+    # Импортирование С++ библиотеки
+    my_dll = ctypes.CDLL(".\\Dll1.dll")
+    # Выделение аргументов функции
+    my_dll.leakDetection.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    my_dll.leakDetection.restype = ctypes.c_int
+    return my_dll
+
+
+def emails_input(dll_modules):
     # Счётчик для файлов .eml
     eml_count = 0
 
@@ -28,7 +38,15 @@ def emails_input():
             print('Путь к файлу: ',file_path)
             # Проверьте, есть ли текстовое тело
             if msg.get_body(preferencelist=('plain',)):
-                print('Содержимое письма (текст):', msg.get_body(preferencelist=('plain',)).get_content())
+                text = msg.get_body(preferencelist=('plain',)).get_content()
+                print('Содержимое письма (текст):', text)
+                text_bytes = text.encode('utf-8')
+                # Проверка на Наличие утечек
+                print(dll_modules(text_bytes,b"account"))
+                print(dll_modules(text_bytes,b"card"))
+                print(dll_modules(text_bytes,b"password"))
+                print(dll_modules(text_bytes,b"phone"))
+                print(dll_modules(text_bytes,b"snils"))
             else:
                 print('Содержимое письма (текст): *Пусто*')
 
@@ -61,4 +79,6 @@ def check_txt_attachment(eml_file):
             print(f"Содержимое '.txt' файла: {part.get_content().decode('utf-16')}")
             break
 
-emails_input()
+if __name__ == '__main__':
+    dll_modules = open_dll()
+    emails_input(dll_modules)
