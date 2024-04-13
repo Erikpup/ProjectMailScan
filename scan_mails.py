@@ -9,10 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Путь к папке с .eml файлами
 folder_path = "C:\\SmallMailBox"
-eml_count = 0
 def process_file(filename):
-    global eml_count
-    eml_count += 1
     file_path = os.path.join(folder_path, filename)
     with open(file_path, 'rb') as f:
         msg = BytesParser(policy=policy.default).parse(f)
@@ -21,7 +18,6 @@ def process_file(filename):
     print('Получатель:', msg['To'])
     print('Дата и время:', msg['Date'])
     print('Путь к файлу: ', file_path)
-    print('Обработано .eml файлов: ', eml_count)
 
     # Проверьте, есть ли текстовое тело
     if msg.get_body(preferencelist=('plain',)):
