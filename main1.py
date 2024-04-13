@@ -1,84 +1,105 @@
-import os
-from email import policy
-from email.parser import BytesParser
-from docx import Document
-import io
+# import kivy
+# from kivy.app import App
+# from kivy.core.window import Window
+# from kivy.graphics import Color, Rectangle
+# from kivy.uix.anchorlayout import AnchorLayout
+# from kivy.uix.button import Button
+# from kivy.uix.floatlayout import FloatLayout
+# from kivy.uix.gridlayout import GridLayout
+# from kivy.uix.label import Label
+# from kivy.uix.scrollview import ScrollView
+#
+#
+# class WindowList(ScrollView):
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+#         with self.canvas:
+#             Color(1, 1, 1, .5)  # set the colour
+#
+#             # Setting the size and position of canvas
+#             self.rect = Rectangle(pos=self.center,
+#                                   size=(self.width / 2.,
+#                                         self.height / 2.))
+#             self.bind(pos=self.update_rect,
+#                       size=self.update_rect)
+#
+#     def update_rect(self, *args):
+#         self.rect.pos = self.pos
+#         self.rect.size = self.size
+#
+#
+# class MainMD(GridLayout):
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+#         with self.canvas:
+#             Color(.234, .456, .678, .8)  # set the colour
+#
+#             # Setting the size and position of canvas
+#             self.rect = Rectangle(pos=self.center,
+#                                   size=(self.width / 2.,
+#                                         self.height / 2.))
+#             self.bind(pos=self.update_rect,
+#                       size=self.update_rect)
+#
+#         self.cols = 2
+#         arch = AnchorLayout(anchor_x='center', anchor_y='center')
+#         list_layout = GridLayout(cols=1, spacing=10, size_hint_y=None)
+#         # Make sure the height is such that there is something to scroll.
+#         list_layout.bind(minimum_height=list_layout.setter('height'))
+#         for i in range(100):
+#             btn = Button(text=str(i), size_hint_y=None, height=40)
+#             list_layout.add_widget(btn)
+#         left_layout = WindowList(size_hint=(.9, .8))
+#         left_layout.add_widget(list_layout)
+#         arch.add_widget(left_layout)
+#         right_layout = FloatLayout()
+#         btn = Button(text="Анализ", size_hint=(.8, .1), pos_hint={"buttom": 1, "x": .1})
+#         right_layout.add_widget(btn)
+#         self.add_widget(arch)
+#         self.add_widget(right_layout)
+#
+#     def update_rect(self, *args):
+#         self.rect.pos = self.pos
+#         self.rect.size = self.size
+#
+#
+# # Defining a class
+# class MyFirstKivyApp(App):
+#
+#     # Function that returns
+#     # the root widget
+#     def build(self):
+#         # Label with text Hello World is
+#         # returned as root widget
+#
+#         return MainMD()
+#
+#     # Here our class is initialized
+#
+#
+# # and its run() method is called.
+# # This initializes and starts
+# # our Kivy application.
+# MyFirstKivyApp().run()
+
 import ctypes
 
-# Путь к папке с .eml файлами
-folder_path = "C:\\SmallMailBox"
+# Загружаем DLL
+my_dll = ctypes.CDLL(".\\Dll1.dll")
 
-def open_dll():
-    # Импортирование С++ библиотеки
-    my_dll = ctypes.CDLL(".\\Dll1.dll")
-    # Выделение аргументов функции
-    my_dll.leakDetection.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-    my_dll.leakDetection.restype = ctypes.c_int
-    return my_dll
+# Текст для проверки
+text = "Сравниваю с Samsung Note 3.67867867867867867867 Телефон в целом нравится. По недостаткам: камера - объективно она хуже чем в НОТЕ3. Несмотря на то, что использую в 90% случаев по работе, качество снимков так себе. Для работы боль-мень хватает. Дисплей - неплох, но под углами вижу искажение, в Ноуте получше. Не напрягает - больше придирки. Собе405028100000002553830седники говорят, что слышно хуже. ЛТЕ - придирки, для работы хватает. Автояркость - иногда глючит. На максимальной громкости звонок подхрипывает. Сенсорная клавиша \"домой\" - на ощупь непонятно где у телефона верх, а где низ.  Телефон ощущается литым, без скрипов. Очень качественная сборка. Интересная оболочка с приятным интерфейсом. В целом мне нравится. Особенно уменьшение диагонали)))"
 
+# Определяем типы аргументов и возвращаемого значения
+my_dll.leakDetection.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+my_dll.leakDetection.restype = ctypes.c_int
 
-def emails_input(dll_modules):
-    # Счётчик для файлов .eml
-    eml_count = 0
+# Преобразуем text в bytes
+text_bytes = text.encode('utf-8')
 
-    # Обход всех .eml файлов в указанной папке
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.eml'):
-            eml_count += 1
-            file_path = os.path.join(folder_path, filename)
+# Вызываем функцию
+leak_type = b"\\b\d{20}\\b"
+result = my_dll.leakDetection(text_bytes, leak_type)
 
-            with open(file_path, 'rb') as f:
-                msg = BytesParser(policy=policy.default).parse(f)
-
-            print('Тема письма:', msg['Subject'])
-            print('Отправитель:', msg['From'])
-            print('Получатель:', msg['To'])
-            print('Дата и время:', msg['Date'])
-            print('Номер: ',eml_count)
-            print('Путь к файлу: ',file_path)
-            # Проверьте, есть ли текстовое тело
-            if msg.get_body(preferencelist=('plain',)):
-                text = msg.get_body(preferencelist=('plain',)).get_content()
-                print('Содержимое письма (текст):', text)
-                text_bytes = text.encode('utf-8')
-                # Проверка на Наличие утечек
-                print(dll_modules(text_bytes,b"account"))
-                print(dll_modules(text_bytes,b"card"))
-                print(dll_modules(text_bytes,b"password"))
-                print(dll_modules(text_bytes,b"phone"))
-                print(dll_modules(text_bytes,b"snils"))
-            else:
-                print('Содержимое письма (текст): *Пусто*')
-
-            check_txt_attachment(file_path)
-            check_word_attachment(file_path)
-
-            print('\n-----------END OF THE FILE--------------\n')
-
-def check_word_attachment(eml_file):
-    if os.path.exists(eml_file):
-        with open(eml_file, 'rb') as f:
-            msg = BytesParser(policy=policy.default).parse(f)
-        for part in msg.iter_parts():
-            if part.get_filename() and part.get_filename().endswith('.docx'):
-                print(f"Название '.docx' файла: {part.get_filename()}")
-                doc_content = part.get_content()
-                document = Document(io.BytesIO(doc_content))
-                doc_text = '\n'.join([paragraph.text for paragraph in document.paragraphs])
-                print(f"Содержимое '.docx' файла: {doc_text}")
-                break
-    else:
-        print("Файл не найден.")
-
-def check_txt_attachment(eml_file):
-    with open(eml_file, 'rb') as f:
-        msg = BytesParser(policy=policy.default).parse(f)
-    for part in msg.iter_parts():
-        if part.get_filename() and part.get_filename().endswith('.txt'):
-            print(f"Название '.txt' файла: {part.get_filename()}")
-            print(f"Содержимое '.txt' файла: {part.get_content().decode('utf-16')}")
-            break
-
-if __name__ == '__main__':
-    dll_modules = open_dll()
-    emails_input(dll_modules)
+# Выводим результат
+print(result)  # Output: 8
