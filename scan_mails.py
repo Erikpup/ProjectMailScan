@@ -3,45 +3,45 @@ from email import policy
 from email.parser import BytesParser
 from docx import Document
 from io import BytesIO
-import PyPDF2
+from pdfminer.high_level import extract_text
+from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor
 
 # Путь к папке с .eml файлами
 folder_path = "C:\\SmallMailBox"
+eml_count = 0
+def process_file(filename):
+    global eml_count
+    eml_count += 1
+    file_path = os.path.join(folder_path, filename)
+    with open(file_path, 'rb') as f:
+        msg = BytesParser(policy=policy.default).parse(f)
+    print('Тема письма:', msg['Subject'])
+    print('Отправитель:', msg['From'])
+    print('Получатель:', msg['To'])
+    print('Дата и время:', msg['Date'])
+    print('Путь к файлу: ', file_path)
+    print('Обработано .eml файлов: ', eml_count)
 
-def emails_input():
-    # Счётчик для файлов .eml
-    eml_count = 0
+    # Проверьте, есть ли текстовое тело
+    if msg.get_body(preferencelist=('plain',)):
+        print('Содержимое письма (текст):', msg.get_body(preferencelist=('plain',)).get_content())
+    else:
+        print('Содержимое письма (текст): *Пусто*')
 
-    # Обход всех .eml файлов в указанной папке
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.eml'):
-            eml_count += 1
-            file_path = os.path.join(folder_path, filename)
+    attachments = check_all_attachments(msg)
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        if '.pdf' in attachments:
+            futures.append(executor.submit(check_pdf_attachment, msg))
+        if '.txt' in attachments:
+            futures.append(executor.submit(check_txt_attachment, msg))
+        if '.docx' in attachments:
+            futures.append(executor.submit(check_docx_attachment, msg))
+        for future in futures:
+            future.result()
 
-            with open(file_path, 'rb') as f:
-                msg = BytesParser(policy=policy.default).parse(f)
-
-            print('Тема письма:', msg['Subject'])
-            print('Отправитель:', msg['From'])
-            print('Получатель:', msg['To'])
-            print('Дата и время:', msg['Date'])
-            print('Номер: ',eml_count)
-            print('Путь к файлу: ',file_path)
-            # Проверьте, есть ли текстовое тело
-            if msg.get_body(preferencelist=('plain',)):
-                print('Содержимое письма (текст):', msg.get_body(preferencelist=('plain',)).get_content())
-            else:
-                print('Содержимое письма (текст): *Пусто*')
-
-            attachments = check_all_attachments(msg)
-            if '.txt' in attachments:
-                check_txt_attachment(msg)
-            if '.docx' in attachments:
-                check_docx_attachment(msg)
-            if '.pdf' in attachments:
-                check_pdf_attachment(msg)
-
-            print('\n-----------END OF THE FILE--------------\n')
+    print('\n-----------END OF THE FILE--------------\n')
 
 def check_docx_attachment(msg):
     for part in msg.iter_parts():
@@ -57,14 +57,13 @@ def check_docx_attachment(msg):
             full_text = '\n'.join([para.text for para in doc.paragraphs])
             print("Название '.docx' файла: ", part.get_filename())
             print("Содержимое '.docx' файла: ", full_text)
-            break
 
 def check_txt_attachment(msg):
     for part in msg.iter_parts():
         if part.get_filename() and part.get_filename().endswith('.txt'):
             print(f"Название '.txt' файла: {part.get_filename()}")
             print(f"Содержимое '.txt' файла: {part.get_content().decode('utf-16')}")
-            break
+
 def check_pdf_attachment(msg):
     for part in msg.iter_parts():
         if part.get_content_maintype() == 'multipart':
@@ -75,15 +74,9 @@ def check_pdf_attachment(msg):
         if attachment is None:
             continue
         if part.get_filename() and part.get_filename().endswith('.pdf'):
-            pdf_file = PyPDF2.PdfReader(BytesIO(attachment))
-            full_text = ''
-            for page_num in range(len(pdf_file.pages)):
-                page = pdf_file.pages[page_num]
-                full_text += page.extract_text()
+            full_text = extract_text(BytesIO(attachment))
             print(f"Название '.pdf' файла: {part.get_filename()}")
             print(f"Содержимое '.pdf' файла: {full_text}")
-            break
-
 
 def check_all_attachments(msg):
     attachments = []
@@ -99,5 +92,14 @@ def check_all_attachments(msg):
             attachments.append(os.path.splitext(part.get_filename())[1])
     return attachments
 
+def emails_input():
 
-emails_input()
+    # Get a list of all .eml files in the specified folder
+    files = [filename for filename in os.listdir(folder_path) if filename.endswith('.eml')]
+
+    # Create a multiprocessing Pool
+    with Pool() as p:
+        p.map(process_file, files)
+
+if __name__ == '__main__':
+    emails_input()
