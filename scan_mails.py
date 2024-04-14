@@ -9,16 +9,20 @@ from io import BytesIO
 import time
 import ctypes
 
-start_time = time.time()
+KIVY_NO_CONSOLELOG=1
 
-def c_analys(text, pattern, file_path, type_file,dict_total):
+start_time = time.time()
+dict_total = {}
+
+def c_analys(text, pattern, file_path, type_file):
+    global dict_total
     dll_module = ctypes.CDLL('./Dll1.dll')
     dll_module.leakDetection.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     dll_module.leakDetection.restype = ctypes.c_bool
     for key, info in pattern.items():
         if dll_module.leakDetection(text.encode("utf-8"), info.encode("utf-8")):
-            print(f"Done {file_path}  |  {type_file}  |  {pattern[key]}  |")
-            dict_total[str(key)].append(file_path,type_file)
+            # print(f"Done {file_path}  |  {type_file}  |  {pattern[key]}  |")
+            dict_total[str(key)].append([file_path, type_file])
             return 1
     return 0
 
@@ -42,14 +46,14 @@ async def process_eml(file_path, pattern,dict_total):
     if body is not None:
         # print(f"Текст из файла {file_path}:")
         # print(body.get_content())
-        c_analys(body.get_content(), pattern, file_path, 'text',dict_total)
+        c_analys(body.get_content(), pattern, file_path, 'text')
 
     for part in msg.iter_parts():
-        await check_pdf_attachment(msg, part, file_path, pattern,dict_total)
-        await check_docx_attachment(msg, part, file_path, pattern,dict_total)
-        await check_txt_attachment(msg, part, file_path, pattern,dict_total)
+        await check_pdf_attachment(msg, part, file_path, pattern)
+        await check_docx_attachment(msg, part, file_path, pattern)
+        await check_txt_attachment(msg, part, file_path, pattern)
 
-async def check_docx_attachment(msg, part, file_path, pattern,dict_total):
+async def check_docx_attachment(msg, part, file_path, pattern):
     if part.get_content_maintype() == 'multipart':
         return
     if part.get('Content-Disposition') is None:
@@ -60,17 +64,17 @@ async def check_docx_attachment(msg, part, file_path, pattern,dict_total):
     if part.get_filename() and part.get_filename().endswith('.docx'):
         doc = Document(BytesIO(attachment))
         text = '\n'.join([para.text for para in doc.paragraphs])
-        c_analys(text, pattern, file_path, '.docx',dict_total)
+        c_analys(text, pattern, file_path, '.docx')
         #print("Название '.docx' файла: ", part.get_filename())
         #print("Содержимое '.docx' файла: ", full_text)
 
-async def check_txt_attachment(msg, part, file_path, pattern,dict_total):
+async def check_txt_attachment(msg, part, file_path, pattern):
     if part.get_filename() and part.get_filename().endswith('.txt'):
         #print(f"Название '.txt' файла: {part.get_filename()}")
         #print(f"Содержимое '.txt' файла: {part.get_content().decode('utf-16')}")
-        c_analys(part.get_content().decode('utf-16'), pattern, file_path, '.txt',dict_total)
+        c_analys(part.get_content().decode('utf-16'), pattern, file_path, '.txt')
 
-async def check_pdf_attachment(msg, part, file_path, pattern,dict_total):
+async def check_pdf_attachment(msg, part, file_path, pattern):
     if part.get_content_maintype() == 'multipart':
         return
     if part.get('Content-Disposition') is None:
@@ -80,7 +84,7 @@ async def check_pdf_attachment(msg, part, file_path, pattern,dict_total):
         return
     if part.get_filename() and part.get_filename().endswith('.pdf'):
         text = extract_text(BytesIO(attachment))
-        c_analys(text, pattern, file_path, '.pdf',dict_total)
+        c_analys(text, pattern, file_path, '.pdf')
         #print(f"Название '.pdf' файла: {part.get_filename()}")
         #print(f"Содержимое '.pdf' файла: {full_text}")
 
@@ -94,12 +98,16 @@ async def process_directory(dir_path, pattern,dict_total):
 
 # Запуск обработки директории
 def start_analys(dir_path, pattern):
+    global dict_total
     dict_total = {}
+
     for key in pattern.keys():
         dict_total[key] = []
+    # print(dict_total,pattern)
     asyncio.run(process_directory(dir_path, pattern, dict_total))
     end_time = time.time()
     execution_time = end_time - start_time
 
     print(f"Время выполнения программы: {execution_time/60} минут")
     return dict_total
+
